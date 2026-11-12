@@ -1,8 +1,8 @@
 
 import numpy as np
+import matplotlib.pyplot as plt
 
-
-def threshold_estimator(raw_data):
+def threshold_estimator(raw_data,k=5):
     """
     Estimates a threshold for spike detection based on the raw data.
 
@@ -16,12 +16,12 @@ def threshold_estimator(raw_data):
     # Calculate the median and Median Absolute Deviation of the raw data
     mad = np.median(np.abs(raw_data - np.median(raw_data)))
 
-    threshold = np.median(raw_data) + 5 * 1.4826 * mad
+    threshold = np.median(raw_data) + k * 1.4826 * mad
 
     return threshold
 
 
-def spike_detector(raw_data, threshold=None):
+def spike_detector(raw_data, threshold=None,k=5):
     """
     Detects spikes in the raw data based on a threshold.
 
@@ -34,7 +34,7 @@ def spike_detector(raw_data, threshold=None):
     """
 
     if threshold is None:
-        threshold = threshold_estimator(raw_data)
+        threshold = threshold_estimator(raw_data,k)
 
     # Count a spike only when the signal first goes above the threshold
     spike_indices = []
@@ -95,3 +95,157 @@ if test1 == [] and test2 == [2] and test3 == [1] and test4 == [1, 5] and test5 =
     print("All tests passed!")
 else:
     print("Some tests failed.")
+
+#part 5
+
+
+data=np.load("spike_data.npz")
+
+fs=1000
+
+def firing_rate_estimator(data,fs,threshold=None,k=5):
+    """
+    Estimates the firing rate based on detected spikes and total recording time.
+
+    Parameters:
+    data (list or np.ndarray): The raw signal data.
+    total_time (float): Total recording time in seconds.
+
+    Returns:
+    float: Estimated firing rate in Hz.
+    """
+    t=data['t']
+    raw_data=data['raw_data']
+    total_time = len(t) / fs
+    spike_indices = spike_detector(raw_data,threshold,k)
+    num_spikes = len(spike_indices)
+    firing_rate = num_spikes / total_time
+    return firing_rate
+#test low boundry k=3
+print("Firing rate with k=3:", firing_rate_estimator(data, fs, k=3), "Hz")
+#test medium boundry k=4
+print("Firing rate with k=4:", firing_rate_estimator(data, fs, k=4), "Hz")
+#test high boundry k=5
+print("Firing rate with k=5:", firing_rate_estimator(data, fs, k=5), "Hz")
+# Plot detected spikes
+
+
+
+raw_data = data['raw_data']
+t = data['t']
+
+# Calculate threshold using k=5
+threshold = threshold_estimator(raw_data, k=5)
+
+# Detect spikes
+spike_indices = spike_detector(raw_data, threshold)
+
+# Plot the raw recording
+plt.figure(figsize=(13, 5))
+plt.plot(t, raw_data, label='Raw voltage recording')
+
+# Plot the detection threshold
+plt.axhline(threshold, color='red', linestyle='--', label='Detection threshold')
+
+# Mark the detected spike onsets
+plt.scatter(t[spike_indices], raw_data[spike_indices],
+            color='red', label='Detected spikes')
+
+plt.xlabel('Time (seconds)')
+plt.ylabel('Voltage')
+plt.title('Neural Recording with Detected Spikes (k=5)')
+plt.legend()
+plt.show()
+
+
+# Part 6 - Comparing Python loop and NumPy spike detection
+
+import time
+
+# Version A - Python loop
+# Same detection logic as my original spike_detector function,
+# but without printing, so it doesn't affect the runtime measurement.
+
+def spike_detector_loop(raw_data, threshold):
+    spike_indices = []
+    i = 0
+
+    while i < len(raw_data):
+        if raw_data[i] > threshold and (i == 0 or raw_data[i - 1] <= threshold):
+            spike_indices.append(i)
+        i += 1
+
+    return spike_indices
+
+
+# Version B - NumPy
+# Find the beginning of each above-threshold interval without a Python loop.
+
+def spike_detector_numpy(raw_data, threshold):
+    above_threshold = raw_data > threshold
+
+    # Find where the signal changes from below to above threshold
+    spike_indices = np.where(
+        above_threshold[1:] & ~above_threshold[:-1]
+    )[0] + 1
+
+    # Check if the first sample is already above threshold
+    if len(raw_data) > 0 and above_threshold[0]:
+        spike_indices = np.insert(spike_indices, 0, 0)
+
+    return spike_indices
+
+
+# Evaluation 1 - Correctness
+
+raw_data = data['raw_data']
+threshold = threshold_estimator(raw_data, k=5)
+
+loop_result = spike_detector_loop(raw_data, threshold)
+numpy_result = spike_detector_numpy(raw_data, threshold)
+
+# Check if both methods detect exactly the same indices
+if np.array_equal(loop_result, numpy_result):
+    print("Correctness check passed!")
+else:
+    print("Correctness check failed!")
+
+print("Loop detected:", len(loop_result), "spikes")
+print("NumPy detected:", len(numpy_result), "spikes")
+
+
+# Evaluation 2 - Runtime comparison
+
+# Repeat the measurements to reduce timing noise
+repeats = 100
+
+loop_times = []
+numpy_times = []
+
+for i in range(repeats):
+
+    start = time.perf_counter()
+    spike_detector_loop(raw_data, threshold)
+    end = time.perf_counter()
+    loop_times.append(end - start)
+
+    start = time.perf_counter()
+    spike_detector_numpy(raw_data, threshold)
+    end = time.perf_counter()
+    numpy_times.append(end - start)
+
+
+# Calculate median runtime for each method
+loop_median = np.median(loop_times)
+numpy_median = np.median(numpy_times)
+
+# Calculate how much faster NumPy is
+speedup = loop_median / numpy_median
+
+print("\nRuntime comparison:")
+print("Number of samples:", len(raw_data))
+print("Timing method: time.perf_counter()")
+print("Number of repetitions:", repeats)
+print("Python loop median runtime:", loop_median * 1000, "ms")
+print("NumPy median runtime:", numpy_median * 1000, "ms")
+print("Speedup:", speedup, "x")
