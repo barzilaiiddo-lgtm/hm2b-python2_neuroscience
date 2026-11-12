@@ -155,8 +155,8 @@ plt.xlabel('Time (seconds)')
 plt.ylabel('Voltage')
 plt.title('Neural Recording with Detected Spikes (k=5)')
 plt.legend()
+plt.savefig("detected_spikes.png", dpi=150, bbox_inches="tight")
 plt.show()
-
 
 # Part 6 - Comparing Python loop and NumPy spike detection
 
@@ -249,3 +249,12 @@ print("Number of repetitions:", repeats)
 print("Python loop median runtime:", loop_median * 1000, "ms")
 print("NumPy median runtime:", numpy_median * 1000, "ms")
 print("Speedup:", speedup, "x")
+
+
+# Check NumPy implementation on the same test cases
+
+print("NumPy test 1:", spike_detector_numpy(np.array([0, 1, 2, 3]), 5))
+print("NumPy test 2:", spike_detector_numpy(np.array([0, 0, 7, 0]), 5))
+print("NumPy test 3:", spike_detector_numpy(np.array([0, 6, 7, 8, 0]), 5))
+print("NumPy test 4:", spike_detector_numpy(np.array([0, 7, 8, 0, 0, 9, 10, 0]), 5))
+print("NumPy test 5:", spike_detector_numpy(np.array([7, 8, 0, 0]), 5))
